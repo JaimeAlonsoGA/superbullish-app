@@ -1,4 +1,4 @@
-import { fetchTokenUsdByCoingeckoId } from "@/services/crypto.service";
+import { fetchTokenUsdByCoingeckoId } from "@/services/networks.service";
 import { useQuery } from "@tanstack/react-query";
 
 export function useTokenPrice(cgId?: string | null) {

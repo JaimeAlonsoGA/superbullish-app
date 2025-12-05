@@ -17,7 +17,7 @@ export async function fetchTokenUsdByCoingeckoId(id: string) {
 }
 
 
-export async function getCryptoData(): Promise<TokenPrice[]> {
+export async function getTokenData(): Promise<TokenPrice[]> {
     const { data, error } = await supabase
         .from('token_prices')
         .select('*');

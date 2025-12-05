@@ -32,7 +32,7 @@ const AuthenticatedApp = () => {
                 <Route path="select-project" element={<SelectedProjectPage />} />
             </Route>
 
-            <Route path="/checkout" element={<ChildPageLayout />}>
+            <Route path="/checkout" element={<PageLayout />}>
                 <Route index element={<CartCheckoutPage />} />
             </Route>
         </Routes >

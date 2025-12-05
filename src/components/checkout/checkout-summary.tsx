@@ -6,13 +6,12 @@ import { CartItem } from "@/types/composites";
 import { useTemplatePrice } from "@/hooks/use-template-price";
 import { useAccount } from "wagmi";
 
-const CheckoutSummary: React.FC<{ items: CartItem[] }> = ({ items }) => {
+const CheckoutSummary: React.FC<{ items: CartItem[], onCheckout: () => void }> = ({ items, onCheckout }) => {
     const { chain } = useAccount();
     const subtotal = items.reduce((sum, item) => {
         const { priceNative } = useTemplatePrice(item.template.price);
         return sum + (priceNative ?? 0);
     }, 0);
-    // const tax = subtotal * 0.1;
     const total = subtotal;
 
     return (
@@ -41,12 +40,12 @@ const CheckoutSummary: React.FC<{ items: CartItem[] }> = ({ items }) => {
                 <div className="space-y-1">
                     <div className="flex justify-between items-baseline">
                         <span className="text-base font-semibold">Total</span>
-                        <span className="text-2xl font-bold">{total.toFixed(4)}</span>
+                        <span className="text-2xl font-bold text-primary">{total.toFixed(4)}</span>
                     </div>
                     <p className="text-xs text-muted-foreground">{chain?.name}</p>
                 </div>
 
-                <Button className="w-full" size="lg">
+                <Button onClick={onCheckout} className="w-full" size="lg">
                     <CreditCard className="w-5 h-5 mr-2" />
                     Proceed to Payment
                 </Button>

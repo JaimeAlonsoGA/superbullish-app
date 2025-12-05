@@ -1,4 +1,4 @@
-import { useTokenPrice } from "@/queries/crypto.queries";
+import { useTokenPrice } from "@/queries/networks.queries";
 import { useMemo } from "react";
 import { useAccount, useBalance } from "wagmi";
 
