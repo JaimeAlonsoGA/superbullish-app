@@ -1,0 +1,19 @@
+Template -> Project Selector -> Customize it --> Add to Cart -- Checkout
+
+28/11
+Checkout module
+    Cart
+    CheckoutPage
+
+...
+
+Checkout Page & Transaction Flow
+
+...
+
+Refine App: 
+    Hacerlo responsivo
+    Auth bugs
+    Navigation from landing 2 explorer
+
+    Implement 2 projects templates

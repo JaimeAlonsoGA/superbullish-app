@@ -1,0 +1,113 @@
+@import "tailwindcss";
+
+@theme {
+  /* === Base colors === */
+  --color-background: #0A0B0D;
+  --color-foreground: #FFFFFF;
+
+  /* === Surface / UI colors === */
+  --color-card: #111215;
+  --color-card-foreground: #F1F1F1;
+
+  --color-popover: #111215;
+  --color-popover-foreground: #F1F1F1;
+
+  /* === Primary === */
+  --color-primary: #007AFF;
+  --color-primary-foreground: #FFFFFF;
+
+  /* === Secondary === */
+  --color-secondary: #2196F3;
+  --color-secondary-foreground: #FFFFFF;
+
+  /* === Muted / subtle === */
+  --color-muted: #B0B0B0;
+  --color-muted-foreground: #B0B0B0;
+
+  /* === Accent === */
+  --color-accent: #2A64F6;
+  --color-accent-foreground: #FFFFFF;
+
+  /* === Destructive === */
+  --color-destructive: #E11D48;
+  --color-destructive-foreground: #FFFFFF;
+
+  /* === Borders / Inputs === */
+  --color-border: #1F2937;
+  --color-input: #2A2B2F;
+  --color-ring: #007AFF;
+
+  /* === Gradients === */
+  --gradient-dark: linear-gradient(135deg, #0A0B0D 0%, #111215 100%);
+  --gradient-electric: linear-gradient(135deg, #007AFF 0%, #2196F3 100%);
+  --gradient-token: linear-gradient(135deg, #2A64F6 0%, #1E4ED8 100%);
+
+  /* === Shadows === */
+  --shadow-glow-primary: 0 0 20px rgba(0, 122, 255, 0.3);
+  --shadow-glow-accent: 0 0 30px rgba(42, 100, 246, 0.4);
+  --shadow-elevated: 0 10px 40px rgba(0, 0, 0, 0.5);
+
+  /* === Typography === */
+  --color-text-primary: #FFFFFF;
+  --color-text-secondary: #F1F1F1;
+  --color-text-muted: #B0B0B0;
+  --color-text-subtle: #999999;
+}
+
+[data-theme="light"] {
+  --color-background: #FFFFFF;
+  --color-foreground: #0A0B0D;
+
+  --color-card: #F9FAFB;
+  --color-card-foreground: #0A0B0D;
+
+  --color-popover: #FFFFFF;
+  --color-popover-foreground: #0A0B0D;
+
+  --color-primary: #1E4ED8;
+  --color-primary-foreground: #FFFFFF;
+
+  --color-secondary: #2A64F6;
+  --color-secondary-foreground: #FFFFFF;
+
+  --color-muted: #E5E7EB;
+  --color-muted-foreground: #374151;
+
+  --color-accent: #007AFF;
+  --color-accent-foreground: #FFFFFF;
+
+  --color-border: #E5E7EB;
+  --color-input: #F3F4F6;
+  --color-ring: #1E4ED8;
+}
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+
+  html,
+  body {
+    @apply bg-background text-foreground antialiased;
+  }
+
+  * {
+    @apply transition-colors duration-300;
+  }
+
+  p {
+    @apply text-base sm:text-lg lg:text-xl text-text-muted;
+  }
+  
+  h2 {
+    @apply text-2xl sm:text-3xl md:text-4xl font-bold;
+  }
+}
+
+.title {
+  @apply text-3xl font-semibold tracking-tight;
+}
+
+.border-app {
+  @apply border-muted-foreground/20
+}
