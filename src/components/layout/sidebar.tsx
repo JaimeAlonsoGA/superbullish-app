@@ -9,7 +9,7 @@ export default function Sidebar() {
     const { isConnected } = useAccount();
 
     return (
-        <aside className="fixed left-0 top-16 bottom-0 w-64 flex flex-col shrink-0 pl-8 pr-4 py-6 bg-card rounded-r-lg overflow-auto">
+        <aside className="hidden md:flex fixed left-0 top-16 bottom-0 w-64 flex-col shrink-0 pl-8 pr-4 py-6 bg-card rounded-r-lg overflow-auto">
             <nav className="space-y-2">
                 {sidebarItems.map((item) => {
                     const isActive = location.pathname === item.path;

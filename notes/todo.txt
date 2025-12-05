@@ -17,3 +17,10 @@ Refine App:
     Navigation from landing 2 explorer
 
     Implement 2 projects templates
+
+
+
+05/12
+Arreglar bug del checkout de eliminar items con removeItems del useCart. 
+Conseguir hacer transferencias falsas para probar el ciclo de las transacciones.
+

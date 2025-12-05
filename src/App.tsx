@@ -42,6 +42,7 @@ export default function App() {
   const toastConfig: Partial<ToasterProps> = {
     position: "top-center",
     theme: "dark",
+    richColors: true,
   };
 
   return (

@@ -16,11 +16,9 @@ export default function ProjectsGrid({ projects, handleSelectProject, handleCrea
     const list = projects ?? [];
     return (
         <section className="space-y-8">
-            {/* <h2 className="text-2xl font-semibold tracking-tight">My Projects</h2> */}
             <div
-                className="flex flex-wrap gap-4"
+                className="flex flex-wrap items-center gap-4"
             >
-                {/* Create Project Tile */}
                 {handleCreateNewProject &&
                     <button
                         className="cursor-pointer group flex flex-col items-center"
@@ -35,7 +33,6 @@ export default function ProjectsGrid({ projects, handleSelectProject, handleCrea
                     </button>
                 }
 
-                {/* Project Cards */}
                 {list.map((c) => {
                     const bg = c.background_color ?? "#f4f4f5";
                     const mainColor = c.main_color ?? "transparent";
@@ -49,7 +46,6 @@ export default function ProjectsGrid({ projects, handleSelectProject, handleCrea
                                 "transition-all hover:shadow-xl hover:-translate-y-1 hover:border-muted-foreground/40"
                             )}
                         >
-                            {/* HEADER */}
                             <CardHeader className="flex flex-row items-center justify-between">
                                 <h3 className="font-semibold text-lg truncate">{c.name}</h3>
 
@@ -64,7 +60,6 @@ export default function ProjectsGrid({ projects, handleSelectProject, handleCrea
                                 )}
                             </CardHeader>
 
-                            {/* LOGO */}
                             <CardContent className="flex justify-center">
                                 <div
                                     className={cn(
@@ -85,7 +80,6 @@ export default function ProjectsGrid({ projects, handleSelectProject, handleCrea
                                 </div>
                             </CardContent>
 
-                            {/* FOOTER */}
                             <CardFooter>
                                 <div className="flex gap-3">
                                     <div className="flex items-center gap-1">

@@ -10,7 +10,7 @@ const PageLayout = () => {
             <PageContent>
                 <Header />
                 <Sidebar />
-                <main className="pt-16 pl-64 h-screen overflow-auto">
+                <main className="pt-16 md:pl-64 h-screen overflow-auto">
                     <div className="px-8 mx-auto max-w-7xl py-8">
                         <Outlet />
                     </div>

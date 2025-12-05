@@ -32,7 +32,7 @@ const CheckoutItemCard: React.FC<CartItemProps> = ({ item, onEdit, onRemove }) =
                     </div>
 
                     <div className="flex-1 min-w-0">
-                        <div className="flex items-start justify-between">
+                        <div className="flex flex-col space-y-2 md:space-y-0 md:flex-row items-start justify-between">
                             <div className="flex-1">
                                 <h3 className="font-semibold truncate">
                                     {item.template.name}
@@ -44,7 +44,7 @@ const CheckoutItemCard: React.FC<CartItemProps> = ({ item, onEdit, onRemove }) =
                                     <Badge variant="secondary" style={{ backgroundColor: item.backgroundColor }}>
                                         {item.project.ticker}
                                     </Badge>
-                                    <span className="text-xs text-muted-foreground">{item.project.name}</span>
+                                    <span className="text-xs text-muted-foreground truncate">{item.project.name}</span>
                                 </div>
                             </div>
                             <div className="text-right ml-4">

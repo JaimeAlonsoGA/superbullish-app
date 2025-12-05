@@ -11,8 +11,8 @@ const ChildPageLayout = () => {
             <PageContent>
                 <Header />
                 <Sidebar />
-                <main className="pl-64 h-screen overflow-auto">
-                    <div className="pt-24 pb-8 px-8 mx-auto max-w-7xl space-y-4">
+                <main className="md:pl-64 h-screen overflow-auto">
+                    <div className="pt-24 pb-6 px-8 mx-auto max-w-7xl space-y-4">
                         <BackButton />
                         <Outlet />
                     </div>

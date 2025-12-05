@@ -16,7 +16,7 @@ const Header = () => {
                         alt="Super Bullish Logo"
                         className="w-8 h-8 sm:w-10 sm:h-10 object-contain"
                     />
-                    <h1 className="text-xl font-bold">Super Bullish</h1>
+                    <h1 className="hidden md:block text-xl font-bold">Super Bullish</h1>
                 </div>
                 <div className="flex flex-row items-center gap-3">
                     {isAuthenticated && <CartSheet />}

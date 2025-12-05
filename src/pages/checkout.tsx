@@ -65,19 +65,6 @@ const CheckoutPage = () => {
                             </p>
                         </div>
 
-                        {!isConnected && (
-                            <Alert>
-                                <Wallet className="h-4 w-4" />
-                                <AlertTitle>Connect Your Wallet</AlertTitle>
-                                <AlertDescription>
-                                    You need to connect your Web3 wallet to complete the purchase.
-                                    <div className="mt-3">
-                                        <ConnectButton />
-                                    </div>
-                                </AlertDescription>
-                            </Alert>
-                        )}
-
                         {isConnected && chain && (
                             <Alert>
                                 <Info className="h-4 w-4" />

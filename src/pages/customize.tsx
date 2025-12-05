@@ -57,7 +57,7 @@ export default function CustomizePage() {
                 <h1 className="text-3xl font-semibold tracking-tight">
                     Customize <span className="text-primary">Video</span>
                 </h1>
-                <div className="space-x-4">
+                <div className="flex flex-col md:flex-row md:space-x-4">
                     <Button variant="link" onClick={() => setOpenDrawer(true)}>Edit Current Project</Button>
                     <Button variant="secondary" onClick={() => navigate(`/template/${template.id}/select-project`)}>Change Project</Button>
                 </div>
