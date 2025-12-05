@@ -77,62 +77,64 @@ const Customizables: React.FC<CustomizationProps> = ({ cartItemId, template, pro
     return (
         <Card className="rounded-2xl border-muted-foreground/20">
             <CardContent className="space-y-6 flex flex-col h-full justify-between">
-                <ScrollArea className="h-72 space-y-4">
-                    {template.headline && (
-                        <div className="space-y-2">
-                            <Label>Headline</Label>
-                            <Input value={headline} onChange={(e) => setHeadline(e.target.value)} placeholder="Enter headline..." />
-                        </div>
-                    )}
-
-                    {template.subheadline && (
-                        <div className="space-y-2">
-                            <Label>Subheadline</Label>
-                            <Textarea value={subheadline} onChange={(e) => setSubheadline(e.target.value)} placeholder="Enter subheadline..." />
-                        </div>
-                    )}
-
-                    <div className="space-y-2">
-                        <Tooltip>
-                            <Label className="text-muted pb-2">Main Color</Label>
-                            <TooltipTrigger>
-                                <div className="py-4 px-8 rounded-md" style={{ backgroundColor: project.main_color }} />
-                            </TooltipTrigger>
-                            <TooltipContent>
-                                <p>Inherent to project</p>
-                            </TooltipContent>
-                        </Tooltip>
-                    </div>
-
-                    {/* Color Picker */}
-                    <div className="space-y-2">
-                        <div className="flex items-center justify-between py-2">
-                            <Label>Background Color <span className="text-primary">{customBgColor && "*"}</span></Label>
-                            {customBgColor && (
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={handleResetColor}
-                                    className="text-xs"
-                                >
-                                    Reset to project default
-                                </Button>
-                            )}
-                        </div>
-
-                        <ColorPicker
-                            value={bgColor}
-                            onChange={handleColorChange}
-                            className="max-w-sm rounded-md border border-muted-foreground/20 bg-card p-4 shadow-sm"
-                        >
-                            <ColorPickerSelection />
-
-                            <div className="flex items-center gap-4">
-                                <div className="grid w-full gap-1">
-                                    <ColorPickerHue />
-                                </div>
+                <ScrollArea className="h-96">
+                    <div className="space-y-4">
+                        {template.headline && (
+                            <div className="space-y-2">
+                                <Label>Headline</Label>
+                                <Input value={headline} onChange={(e) => setHeadline(e.target.value)} placeholder="Enter headline..." />
                             </div>
-                        </ColorPicker>
+                        )}
+
+                        {template.subheadline && (
+                            <div className="space-y-2">
+                                <Label>Subheadline</Label>
+                                <Textarea value={subheadline} onChange={(e) => setSubheadline(e.target.value)} placeholder="Enter subheadline..." />
+                            </div>
+                        )}
+
+                        <div className="space-y-2">
+                            <Tooltip>
+                                <Label className="text-muted pb-2">Main Color</Label>
+                                <TooltipTrigger>
+                                    <div className="py-4 px-8 rounded-md" style={{ backgroundColor: project.main_color }} />
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                    Inherent to project
+                                </TooltipContent>
+                            </Tooltip>
+                        </div>
+
+                        {/* Color Picker */}
+                        <div className="space-y-2">
+                            <div className="flex items-center justify-between py-2">
+                                <Label>Background Color <span className="text-primary">{customBgColor && "*"}</span></Label>
+                                {customBgColor && (
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={handleResetColor}
+                                        className="text-xs"
+                                    >
+                                        Reset to project default
+                                    </Button>
+                                )}
+                            </div>
+
+                            <ColorPicker
+                                value={bgColor}
+                                onChange={handleColorChange}
+                                className="max-w-sm rounded-md border border-muted-foreground/20 bg-card p-4 shadow-sm"
+                            >
+                                <ColorPickerSelection />
+
+                                <div className="flex items-center gap-4">
+                                    <div className="grid w-full gap-1">
+                                        <ColorPickerHue />
+                                    </div>
+                                </div>
+                            </ColorPicker>
+                        </div>
                     </div>
                 </ScrollArea>
 
