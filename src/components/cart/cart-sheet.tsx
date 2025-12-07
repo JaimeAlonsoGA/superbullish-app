@@ -39,9 +39,11 @@ const CartSheet = () => {
                     {items.length === 0 ? (
                         <div className="text-center py-12 space-y-4">
                             <p className="text-muted-foreground">Your cart is empty</p>
-                            <Button onClick={() => navigate("/explore")}>
-                                Browse templates
-                            </Button>
+                            <SheetClose asChild>
+                                <Button onClick={() => navigate("/explore")}>
+                                    Browse templates
+                                </Button>
+                            </SheetClose>
                         </div>
                     ) : (
                         items.map((item) => (
@@ -52,9 +54,11 @@ const CartSheet = () => {
 
                 {items.length > 0 && (
                     <SheetFooter className="border-t border-muted-foreground/20 pt-4 space-y-3">
-                        <Button className="w-full" onClick={handleCheckout}>
-                            Checkout ({items.length})
-                        </Button>
+                        <SheetClose asChild>
+                            <Button className="w-full" onClick={handleCheckout}>
+                                Checkout ({items.length})
+                            </Button>
+                        </SheetClose>
 
                         <SheetClose asChild>
                             <Button variant="outline" className="w-full" onClick={clearCart}>

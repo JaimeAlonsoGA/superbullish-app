@@ -5,10 +5,21 @@ import { Link } from "react-router-dom";
 import { Template } from "@/types";
 import { useAccount } from "wagmi";
 import { useTemplatePrice } from "@/hooks/use-template-price";
+import { useConnectModal } from "@rainbow-me/rainbowkit";
+import { useAuth } from "@/providers/auth-provider";
 
 export default function TemplateCard({ template }: { template: Template }) {
     const [hovered, setHovered] = useState(false);
     const { formattedPrice } = useTemplatePrice(template.price);
+    const { openConnectModal } = useConnectModal();
+    const { isAuthenticated } = useAuth();
+
+    function handleCardClick(e: React.MouseEvent) {
+        if (!isAuthenticated) {
+            e.preventDefault();
+            openConnectModal?.();
+        }
+    }
 
     return (
         <Link
@@ -16,6 +27,7 @@ export default function TemplateCard({ template }: { template: Template }) {
             className="group block rounded-xl overflow-hidden transition-all hover:scale-[1.02]"
             onMouseEnter={() => setHovered(true)}
             onMouseLeave={() => setHovered(false)}
+            onClick={handleCardClick}
         >
             <div className="rounded-xl relative aspect-video w-full bg-linear-to-br from-muted/40 to-muted/10 overflow-hidden">
                 {hovered ? (

@@ -11,8 +11,6 @@ export function AppContent() {
   const { loading, isAuthenticated, isSigningOut } = useAuth();
   const { isConnected } = useAccount();
 
-  // console.log('AppContent render:', { loading, isAuthenticated, isSigningOut, isConnected });
-
   if (loading || isSigningOut) {
     return (
       <div className="flex items-center justify-center h-screen bg-linear-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
@@ -27,7 +25,7 @@ export function AppContent() {
     return (
       <div className="flex items-center justify-center h-screen bg-linear-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
         <div className="text-center text-gray-500 dark:text-gray-400">
-          Finalizing authentication...
+          Finalizing authentication. Confirm the access to your wallet...
         </div>
       </div>
     );
@@ -41,7 +39,6 @@ export function AppContent() {
 export default function App() {
   const toastConfig: Partial<ToasterProps> = {
     position: "top-center",
-    theme: "dark",
     richColors: true,
   };
 

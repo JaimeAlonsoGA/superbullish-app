@@ -14,7 +14,7 @@ const Hero = () => (
                 </p>
                 <div className="mt-6">
                     <Button asChild>
-                        <Link to="/templates" className="inline-flex items-center gap-2">
+                        <Link to="/explore" className="inline-flex items-center gap-2">
                             <Play />
                             <span>Get Your Crypto Video</span>
                         </Link>

@@ -5,9 +5,11 @@ import ProjectsGrid from "@/components/project/projects-grid"
 import { Project } from "@/types";
 import { useState } from "react";
 import ProjectFormDrawer from "@/components/project/project-form-drawer";
+import { useProjectsByUser } from "@/queries/projects.queries";
 
 export default function DashboardPage() {
     const { data: user, isLoading } = useCurrentUser();
+    const { data: projects } = useProjectsByUser(user?.id);
     const [openDrawer, setOpenDrawer] = useState(false);
     const [selectedProject, setSelectedProject] = useState<Project | null>(null);
 
@@ -22,7 +24,7 @@ export default function DashboardPage() {
 
     return (
         <div className="space-y-6">
-            <ProjectsGrid projects={user?.projects ?? null} handleSelectProject={handleSelectProject} />
+            <ProjectsGrid projects={projects ?? null} handleSelectProject={handleSelectProject} />
             <div className="text-muted flex flex-row gap-2 items-center">
                 <Filter className="h-4 w-4" />
                 <h3>Filter:</h3>

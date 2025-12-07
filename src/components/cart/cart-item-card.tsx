@@ -6,6 +6,7 @@ import { useCart } from "@/providers/cart-provider";
 import { Card, CardContent, CardFooter } from "../ui/card";
 import { Button } from "../ui/button";
 import { CartItem } from "@/types/composites";
+import { SheetClose } from "../ui/sheet";
 
 export const CartItemCard = ({ item }: { item: CartItem }) => {
     const { removeItem } = useCart();
@@ -46,7 +47,7 @@ export const CartItemCard = ({ item }: { item: CartItem }) => {
                     </button>
                 </div>
 
-                <div>
+                <SheetClose asChild>
                     <Button
                         variant="link"
                         className="p-0 text-primary"
@@ -54,7 +55,7 @@ export const CartItemCard = ({ item }: { item: CartItem }) => {
                     >
                         Customize
                     </Button>
-                </div>
+                </SheetClose>
             </CardContent>
 
 

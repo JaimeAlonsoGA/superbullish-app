@@ -42,6 +42,7 @@ import {
 import type { Project } from "@/types";
 import { useCurrentUser } from "@/queries/auth.queries";
 import ButtonLoading from "../ui/custom/button-loading";
+import { toast } from "sonner";
 
 interface Props {
     project?: Project | null;
@@ -102,6 +103,7 @@ export default function ProjectFormDrawer({
         setPreview(url);
         return () => URL.revokeObjectURL(url);
     }, [file]);
+
     const handleSubmit = form.handleSubmit(async (values) => {
         setLoading(true);
         try {
@@ -123,16 +125,19 @@ export default function ProjectFormDrawer({
 
             setClose(false);
 
-            // Opcional: Muestra un toast de confirmación
-            // toast.success("Project saved successfully!");
+            toast.success("Project saved successfully!");
 
         } catch (err) {
             onError?.(err);
-            // Opcional: toast.error("Failed to save project");
+            toast.error("Failed to save project");
         } finally {
             setLoading(false);
         }
     });
+
+    const handleDelete = () => {
+        toast.error("Project deletion is not implemented yet.");
+    }
 
     return (
         <Drawer open={trigger} onOpenChange={setClose}>
@@ -290,11 +295,17 @@ export default function ProjectFormDrawer({
                         {project ? "Save changes" : "Create Project"}
                     </ButtonLoading>
 
-                    <DrawerClose asChild>
-                        <Button variant="outline" className="w-full h-11">
-                            <span>Cancel</span>
+                    <div className="grid grid-cols-2 gap-2">
+                        <DrawerClose asChild>
+                            <Button variant="outline">
+                                <span>Cancel</span>
+                            </Button>
+                        </DrawerClose>
+
+                        <Button variant="destructive" disabled={loading || !project} onClick={handleDelete}>
+                            Delete
                         </Button>
-                    </DrawerClose>
+                    </div>
                 </DrawerFooter>
             </DrawerContent>
         </Drawer >

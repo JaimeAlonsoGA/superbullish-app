@@ -12,7 +12,7 @@ const TemplateDetails = ({ template }: { template: Template }) => {
                     </Badge>
                 </div>}
 
-                <h1 className="text-3xl font-bold mt-2">
+                <h1 className="title mt-2">
                     {template.name}
                 </h1>
             </div>

@@ -1,5 +1,5 @@
 import ChildPageLayout from "@/components/layout/child-page-layout";
-import PageLayout from "@/components/layout/page-layout";
+import PageLayout from "@/components/layout/authenticated-page-layout";
 import CartCheckoutPage from "@/pages/checkout";
 import ProjectPage from "@/pages/project";
 import DashboardPage from "@/pages/dashboard";
@@ -29,6 +29,9 @@ const AuthenticatedApp = () => {
             <Route path="/template/:id" element={<ChildPageLayout />}>
                 <Route index element={<TemplatePage />} />
                 <Route path="customize" element={<CustomizePage />} />
+            </Route>
+
+            <Route path="/template/:id" element={<PageLayout />}>
                 <Route path="select-project" element={<SelectedProjectPage />} />
             </Route>
 

@@ -73,7 +73,7 @@ const VideoUpdatesMarquee: React.FC = () => {
                     {videos.map(video => (
                         <MarqueeItem key={`first-${video.id}`}>
                             <article className="w-80 flex flex-col hover:scale-105 transform transition-all duration-300 mx-4">
-                                <Link to={`/template/${video.id}`} className="block w-full">
+                                <Link to={`/explore`} className="block w-full">
                                     <div className="w-full h-48 overflow-hidden rounded-t-xl">
                                         <img
                                             src={video.thumbnail_url}
