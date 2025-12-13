@@ -53,7 +53,16 @@ export async function fetchUserWithProjectsAndTransactions(
     // transactions with the related record and its template
     const { data: transactions, error: transactionsError } = await supabase
         .from('transactions')
-        .select('*, record:records(*, template:templates(*))')
+        .select(`
+            *, 
+            records:records(
+                *, 
+                template:templates(*), 
+                project:projects!records_project_id_fkey(*),
+                dual_project:projects!records_dual_project_id_fkey(*)
+            ), 
+            blockchainNetwork:blockchain_networks(*)
+        `)
         .eq('user_id', user.id);
 
     if (transactionsError) {

@@ -7,10 +7,7 @@ import {
     useSignInWithWeb3,
     useSignUp,
     useSignOut,
-    useResetPassword,
-    useUpdatePassword,
     useRefreshUser,
-    useSignInWithOAuth,
     authKeys
 } from '@/queries/auth.queries';
 import { useAccount, useDisconnect } from 'wagmi';
@@ -25,11 +22,6 @@ interface AuthContextType {
     signIn: ReturnType<typeof useSignInWithWeb3>['mutateAsync'];
     signUp: ReturnType<typeof useSignUp>['mutateAsync'];
     signOut: () => Promise<void>;
-    resetPassword: ReturnType<typeof useResetPassword>['mutateAsync'];
-    updatePassword: ReturnType<typeof useUpdatePassword>['mutateAsync'];
-    signInWithGoogle: () => Promise<any>;
-    signInWithApple: () => Promise<any>;
-
     // Utility methods
     refreshUser: () => Promise<void>;
     isAuthenticated: boolean;
@@ -38,7 +30,6 @@ interface AuthContextType {
     isSigningIn: boolean;
     isSigningUp: boolean;
     isSigningOut: boolean;
-    isSigningInWithOAuth: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -59,10 +50,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const signInMutation = useSignInWithWeb3();
     const signUpMutation = useSignUp();
     const signOutMutation = useSignOut();
-    const resetPasswordMutation = useResetPassword();
-    const updatePasswordMutation = useUpdatePassword();
     const refreshUserMutation = useRefreshUser();
-    const signInWithOAuthMutation = useSignInWithOAuth();
 
     // Auto sign-in effect when wallet connects
     useEffect(() => {
@@ -121,10 +109,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await signOutMutation.mutateAsync();
     };
 
-    // OAuth sign in handlers
-    const handleSignInWithGoogle = () => signInWithOAuthMutation.mutateAsync('google');
-    const handleSignInWithApple = () => signInWithOAuthMutation.mutateAsync('apple');
-
     // Enhanced refresh user function
     const handleRefreshUser = async () => {
         await refreshUserMutation.mutateAsync();
@@ -149,11 +133,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         signIn: signInMutation.mutateAsync,
         signUp: signUpMutation.mutateAsync,
         signOut: handleSignOut,
-        resetPassword: resetPasswordMutation.mutateAsync,
-        updatePassword: updatePasswordMutation.mutateAsync,
-        signInWithGoogle: handleSignInWithGoogle,
-        signInWithApple: handleSignInWithApple,
-
         // Utility methods
         refreshUser: handleRefreshUser,
         isAuthenticated,
@@ -162,7 +141,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isSigningIn: signInMutation.isPending,
         isSigningUp: signUpMutation.isPending,
         isSigningOut: signOutMutation.isPending,
-        isSigningInWithOAuth: signInWithOAuthMutation.isPending,
     };
 
     return (

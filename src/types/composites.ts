@@ -1,4 +1,5 @@
-import { Project, User, Template, Record, Transaction } from ".";
+import { Project, User, Template, Record, Transaction, BlockchainNetwork } from ".";
+import { RecordStatus, TransactionStatus } from "./definitions";
 
 export interface UserWithProjectsAndTransactions extends User {
     projects: Project[] | null;
@@ -6,16 +7,15 @@ export interface UserWithProjectsAndTransactions extends User {
 }
 
 export interface TransactionsData extends Transaction {
-    record: RecordWithTemplate;
+    records: RecordWithTemplate[];
+    blockchainNetwork: BlockchainNetwork;
+    status: TransactionStatus;
 }
 
 export interface RecordWithTemplate extends Record {
     template: Template;
-}
-
-export interface TemplateWithProject extends Template {
-    project: Project
-    dualProject: Project | null;
+    project: Project;
+    status: RecordStatus;
 }
 
 export interface CartItem {

@@ -54,7 +54,7 @@ export default function CustomizePage() {
     return (
         <div className="w-full flex flex-col gap-6">
             <div className="flex items-center justify-between">
-                <h1 className="text-3xl font-semibold tracking-tight">
+                <h1 className="title">
                     Customize <span className="text-primary">Video</span>
                 </h1>
                 <div className="flex flex-col md:flex-row md:space-x-4">

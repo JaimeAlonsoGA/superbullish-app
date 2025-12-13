@@ -1,6 +1,7 @@
 import { supabase } from "@/lib/supabase/client";
 import { Transaction, TransactionInsert, Record, RecordInsert } from "@/types";
 import { CartItem } from "@/types/composites";
+import { RecordStatus, TransactionStatus } from "@/types/definitions";
 
 interface CreateTransactionParams {
     items: CartItem[];
@@ -30,7 +31,7 @@ export async function createTransactionWithRecords(
         tx_hash: transactionHash,
         blockchain_network_id: chain.id,
         total: amount,
-        status: 'pending',
+        status: 'success' as TransactionStatus,
         created_at: new Date().toISOString(),
     };
 
@@ -53,8 +54,8 @@ export async function createTransactionWithRecords(
         background_color: item.backgroundColor,
         headline: item.headline,
         subheadline: item.subheadline,
-        status: 'pending',
-        created_at: new Date().toISOString(),
+        status: 'processing' as RecordStatus,
+        order_number: item.id,
     }));
 
     const { error: recordsError } = await supabase
@@ -87,7 +88,7 @@ export async function createTransactionWithRecords(
 
 export async function updateTransactionStatus(
     transactionId: string,
-    status: 'pending' | 'confirmed' | 'failed'
+    status: TransactionStatus
 ): Promise<void> {
     const { error } = await supabase
         .from('transactions')
@@ -101,11 +102,21 @@ export async function updateTransactionStatus(
         console.error('Error updating transaction status:', error);
         throw new Error('Failed to update transaction status');
     }
+}
 
-    await supabase
+export async function updateRecordStatus(
+    recordId: string,
+    status: RecordStatus
+): Promise<void> {
+    const { error } = await supabase
         .from('records')
         .update({ status })
-        .eq('transaction_id', transactionId);
+        .eq('id', recordId);
+
+    if (error) {
+        console.error('Error updating record status:', error);
+        throw new Error('Failed to update record status');
+    }
 }
 
 export async function getTransactionsByUser(

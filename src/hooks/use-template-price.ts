@@ -25,6 +25,8 @@ const CHAIN_ID_TO_COINGECKO_ID: Record<number, string> = {
     137: "matic-network",
     43114: "avalanche-2",
     42161: "arbitrum",
+    43113: "avalanche-2", // Fuji
+    11155111: "ethereum", // Sepolia
 };
 
 export function useTemplatePrice(

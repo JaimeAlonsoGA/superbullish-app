@@ -1,7 +1,6 @@
 import ChildPageLayout from "@/components/layout/child-page-layout";
 import PageLayout from "@/components/layout/authenticated-page-layout";
 import CartCheckoutPage from "@/pages/checkout";
-import ProjectPage from "@/pages/project";
 import DashboardPage from "@/pages/dashboard";
 import ExplorePage from "@/pages/explore";
 import TemplatePage from "@/pages/template";
@@ -20,10 +19,6 @@ const AuthenticatedApp = () => {
 
             <Route path="/explore" element={<PageLayout />}>
                 <Route index element={<ExplorePage />} />
-            </Route>
-
-            <Route path="/project/:id" element={<ChildPageLayout />}>
-                <Route index element={<ProjectPage />} />
             </Route>
 
             <Route path="/template/:id" element={<ChildPageLayout />}>

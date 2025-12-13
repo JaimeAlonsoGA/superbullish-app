@@ -1,0 +1,1254 @@
+| schema | name                             | definition                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| ------ | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+
+| public | log_payment_verification         | CREATE OR REPLACE FUNCTION public.log_payment_verification(p_order_id uuid, p_tx_hash text, p_network text, p_amount numeric, p_status text, p_error_message text DEFAULT NULL::text, p_verification_source text DEFAULT 'edge-function'::text)
+ RETURNS uuid
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
+DECLARE
+  log_id uuid;
+BEGIN
+  INSERT INTO payment_logs (
+    order_id,
+    tx_hash,
+    network,
+    amount,
+    status,
+    error_message,
+    verification_source
+  ) VALUES (
+    p_order_id,
+    p_tx_hash,
+    p_network,
+    p_amount,
+    p_status,
+    p_error_message,
+    p_verification_source
+  )
+  RETURNING id INTO log_id;
+  
+  RETURN log_id;
+END;
+$function$
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| public | verify_payment                   | CREATE OR REPLACE FUNCTION public.verify_payment(p_order_id uuid, p_tx_hash text, p_confirmations integer DEFAULT NULL::integer)
+ RETURNS boolean
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
+DECLARE
+  v_order orders%ROWTYPE;
+  v_network_config network_config%ROWTYPE;
+  v_required_confirmations integer;
+  v_status text;
+  v_transaction_status text;
+BEGIN
+  -- Get order details
+  SELECT * INTO v_order FROM orders WHERE id = p_order_id;
+  
+  IF NOT FOUND THEN
+    PERFORM log_payment_verification(
+      p_order_id,
+      p_tx_hash,
+      'unknown',
+      0,
+      'error',
+      'Order not found',
+      'db-function'
+    );
+    RETURN false;
+  END IF;
+  
+  -- Get network configuration
+  SELECT * INTO v_network_config 
+  FROM network_config 
+  WHERE network_name = v_order.network_used;
+  
+  IF FOUND THEN
+    v_required_confirmations := v_network_config.required_confirmations;
+  ELSE
+    v_required_confirmations := 3; -- Default
+  END IF;
+  
+  -- Determine status based on confirmations
+  IF p_confirmations IS NULL OR p_confirmations < v_required_confirmations THEN
+    v_status := 'payment_pending';
+    v_transaction_status := 'pending_confirmation';
+  ELSE
+    v_status := 'in_production';
+    v_transaction_status := 'confirmed';
+  END IF;
+  
+  -- Update order
+  UPDATE orders SET
+    tx_hash = p_tx_hash,
+    hash_id = p_tx_hash,
+    status = v_status,
+    transaction_status = v_transaction_status,
+    confirmation_count = COALESCE(p_confirmations, 0),
+    payment_verified_at = CASE WHEN v_status = 'in_production' THEN now() ELSE NULL END,
+    payment_verified_by = 'db-function',
+    updated_at = now()
+  WHERE id = p_order_id;
+  
+  -- Log verification
+  PERFORM log_payment_verification(
+    p_order_id,
+    p_tx_hash,
+    v_order.network_used,
+    v_order.price,
+    'success',
+    NULL,
+    'db-function'
+  );
+  
+  RETURN true;
+EXCEPTION WHEN OTHERS THEN
+  PERFORM log_payment_verification(
+    p_order_id,
+    p_tx_hash,
+    COALESCE(v_order.network_used, 'unknown'),
+    COALESCE(v_order.price, 0),
+    'error',
+    SQLERRM,
+    'db-function'
+  );
+  RETURN false;
+END;
+$function$
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| public | get_distinct_categories          | CREATE OR REPLACE FUNCTION public.get_distinct_categories(level integer DEFAULT 1, parent_category text DEFAULT NULL::text, parent_category2 text DEFAULT NULL::text)
+ RETURNS TABLE(category_name text, template_count bigint)
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
+BEGIN
+  IF level = 1 THEN
+    RETURN QUERY
+    SELECT 
+      vt.category as category_name,
+      COUNT(*)::bigint as template_count
+    FROM video_templates vt
+    WHERE vt.is_active = true
+      AND vt.is_hidden = false
+      AND vt.category IS NOT NULL
+    GROUP BY vt.category
+    ORDER BY vt.category;
+  ELSIF level = 2 THEN
+    RETURN QUERY
+    SELECT 
+      vt.category2 as category_name,
+      COUNT(*)::bigint as template_count
+    FROM video_templates vt
+    WHERE vt.is_active = true
+      AND vt.is_hidden = false
+      AND vt.category2 IS NOT NULL
+      AND (parent_category IS NULL OR vt.category = parent_category)
+    GROUP BY vt.category2
+    ORDER BY vt.category2;
+  ELSIF level = 3 THEN
+    RETURN QUERY
+    SELECT 
+      vt.category3 as category_name,
+      COUNT(*)::bigint as template_count
+    FROM video_templates vt
+    WHERE vt.is_active = true
+      AND vt.is_hidden = false
+      AND vt.category3 IS NOT NULL
+      AND (parent_category IS NULL OR vt.category = parent_category)
+      AND (parent_category2 IS NULL OR vt.category2 = parent_category2)
+    GROUP BY vt.category3
+    ORDER BY vt.category3;
+  END IF;
+END;
+$function$
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| public | generate_wallet_nonce            | CREATE OR REPLACE FUNCTION public.generate_wallet_nonce(p_wallet_address text)
+ RETURNS text
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
+DECLARE
+  v_nonce text;
+  v_expires_at timestamptz;
+BEGIN
+  -- Validate input
+  IF p_wallet_address IS NULL OR p_wallet_address = '' THEN
+    RAISE EXCEPTION 'Wallet address cannot be null or empty';
+  END IF;
+
+  -- Normalize wallet address to lowercase
+  p_wallet_address := lower(p_wallet_address);
+
+  -- Validate wallet address format (basic check)
+  IF NOT p_wallet_address ~ '^0x[a-f0-9]{40}$' THEN
+    RAISE EXCEPTION 'Invalid wallet address format';
+  END IF;
+
+  -- Clean up expired nonces for this wallet address
+  DELETE FROM nonces 
+  WHERE wallet_address = p_wallet_address 
+    AND expires_at < now();
+
+  -- Generate a random nonce (32 characters)
+  v_nonce := encode(gen_random_bytes(16), 'hex');
+  
+  -- Set expiration time (5 minutes from now)
+  v_expires_at := now() + interval '5 minutes';
+
+  -- Insert the new nonce
+  INSERT INTO nonces (
+    wallet_address,
+    nonce,
+    expires_at,
+    is_used
+  ) VALUES (
+    p_wallet_address,
+    v_nonce,
+    v_expires_at,
+    false
+  );
+
+  -- Return the nonce
+  RETURN v_nonce;
+EXCEPTION
+  WHEN OTHERS THEN
+    -- Log the error and re-raise
+    RAISE EXCEPTION 'Failed to generate nonce: %', SQLERRM;
+END;
+$function$
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| public | get_beta_access_status           | CREATE OR REPLACE FUNCTION public.get_beta_access_status(p_wallet_address text)
+ RETURNS boolean
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
+DECLARE
+  v_normalized_address text;
+BEGIN
+  v_normalized_address := LOWER(p_wallet_address);
+  
+  RETURN EXISTS (
+    SELECT 1 FROM beta_access_requests
+    WHERE wallet_address = v_normalized_address
+    AND status = 'approved'
+  );
+END;
+$function$
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| public | verify_wallet_nonce              | CREATE OR REPLACE FUNCTION public.verify_wallet_nonce(p_wallet_address text, p_nonce text)
+ RETURNS boolean
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
+BEGIN
+    -- Use the new validation function
+    RETURN validate_and_consume_nonce(p_wallet_address, p_nonce);
+END;
+$function$
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| public | debug_wallet_nonces              | CREATE OR REPLACE FUNCTION public.debug_wallet_nonces(p_wallet_address text)
+ RETURNS TABLE(id uuid, nonce text, created_at timestamp with time zone, expires_at timestamp with time zone, is_used boolean, is_expired boolean, is_valid boolean)
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
+DECLARE
+  normalized_address text;
+BEGIN
+  normalized_address := lower(p_wallet_address);
+  
+  RETURN QUERY
+  SELECT 
+    n.id,
+    n.nonce,
+    n.created_at,
+    n.expires_at,
+    n.is_used,
+    n.expires_at <= now() AS is_expired,
+    (NOT n.is_used AND n.expires_at > now()) AS is_valid
+  FROM nonces n
+  WHERE n.wallet_address = normalized_address
+  ORDER BY n.created_at DESC;
+END;
+$function$
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| public | get_payment_verification_history | CREATE OR REPLACE FUNCTION public.get_payment_verification_history(p_order_id uuid DEFAULT NULL::uuid, p_tx_hash text DEFAULT NULL::text, p_correlation_id uuid DEFAULT NULL::uuid, p_limit integer DEFAULT 100)
+ RETURNS TABLE(id uuid, order_id uuid, tx_hash text, network text, amount numeric, status text, error_message text, verification_source text, verification_step text, correlation_id uuid, processing_time_ms integer, created_at timestamp with time zone, request_summary jsonb, response_summary jsonb)
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
+BEGIN
+  RETURN QUERY
+  SELECT 
+    pl.id,
+    pl.order_id,
+    pl.tx_hash,
+    pl.network,
+    pl.amount,
+    pl.status,
+    pl.error_message,
+    pl.verification_source,
+    pl.verification_step,
+    pl.correlation_id,
+    pl.processing_time_ms,
+    pl.created_at,
+    -- Create summarized versions of request/response to avoid overwhelming results
+    jsonb_build_object(
+      'method', COALESCE(pl.request_data->>'method', 'N/A'),
+      'url', COALESCE(pl.request_data->>'url', 'N/A'),
+      'has_params', (pl.request_data ? 'params')::boolean
+    ) as request_summary,
+    jsonb_build_object(
+      'status', COALESCE(pl.response_data->>'status', 'N/A'),
+      'success', COALESCE((pl.response_data->>'success')::boolean, false),
+      'has_error', (pl.response_data ? 'error')::boolean
+    ) as response_summary
+  FROM 
+    payment_logs pl
+  WHERE
+    (p_order_id IS NULL OR pl.order_id = p_order_id) AND
+    (p_tx_hash IS NULL OR pl.tx_hash = p_tx_hash) AND
+    (p_correlation_id IS NULL OR pl.correlation_id = p_correlation_id)
+  ORDER BY 
+    pl.created_at DESC
+  LIMIT 
+    p_limit;
+END;
+$function$
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| public | validate_referral_code           | CREATE OR REPLACE FUNCTION public.validate_referral_code(p_code text, p_wallet_address text)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
+DECLARE
+  v_code_record referral_codes%ROWTYPE;
+  v_normalized_address text;
+  v_request_id uuid;
+BEGIN
+  -- Normalize wallet address
+  v_normalized_address := LOWER(p_wallet_address);
+  
+  -- Validate wallet address format
+  IF NOT (v_normalized_address ~ '^0x[a-f0-9]{40}$') THEN
+    RETURN jsonb_build_object(
+      'success', false,
+      'error', 'Invalid wallet address format'
+    );
+  END IF;
+  
+  -- Check if wallet already has beta access
+  IF EXISTS (
+    SELECT 1 FROM beta_access_requests
+    WHERE wallet_address = v_normalized_address
+    AND status = 'approved'
+  ) THEN
+    RETURN jsonb_build_object(
+      'success', true,
+      'message', 'Wallet already has beta access'
+    );
+  END IF;
+  
+  -- Find the referral code
+  SELECT * INTO v_code_record
+  FROM referral_codes
+  WHERE code = p_code
+    AND is_active = true
+    AND (expires_at IS NULL OR expires_at > now());
+  
+  -- Log the attempt
+  INSERT INTO beta_access_requests (
+    wallet_address,
+    referral_code,
+    status,
+    error_message
+  ) VALUES (
+    v_normalized_address,
+    p_code,
+    CASE 
+      WHEN v_code_record.id IS NULL THEN 'invalid_code'
+      ELSE 'pending'
+    END,
+    CASE 
+      WHEN v_code_record.id IS NULL THEN 'Referral code not found or expired'
+      ELSE NULL
+    END
+  ) RETURNING id INTO v_request_id;
+  
+  -- If code not found
+  IF v_code_record.id IS NULL THEN
+    RETURN jsonb_build_object(
+      'success', false,
+      'error', 'Invalid or expired referral code'
+    );
+  END IF;
+  
+  -- Check if code has remaining uses
+  IF v_code_record.current_uses >= v_code_record.max_uses THEN
+    UPDATE beta_access_requests
+    SET status = 'rejected', error_message = 'Referral code has reached maximum uses'
+    WHERE id = v_request_id;
+    
+    RETURN jsonb_build_object(
+      'success', false,
+      'error', 'Referral code has reached maximum uses'
+    );
+  END IF;
+  
+  -- Code is valid, grant access
+  UPDATE referral_codes
+  SET 
+    current_uses = current_uses + 1,
+    used_by = CASE WHEN is_single_use THEN (SELECT id FROM profiles WHERE wallet_address = v_normalized_address) ELSE used_by END,
+    used_at = CASE WHEN is_single_use THEN now() ELSE used_at END,
+    updated_at = now()
+  WHERE id = v_code_record.id;
+  
+  -- Update request status
+  UPDATE beta_access_requests
+  SET status = 'approved'
+  WHERE id = v_request_id;
+  
+  RETURN jsonb_build_object(
+    'success', true,
+    'message', 'Beta access granted successfully',
+    'code_description', v_code_record.description
+  );
+  
+EXCEPTION WHEN OTHERS THEN
+  -- Log error
+  UPDATE beta_access_requests
+  SET status = 'rejected', error_message = SQLERRM
+  WHERE id = v_request_id;
+  
+  RETURN jsonb_build_object(
+    'success', false,
+    'error', 'System error: ' || SQLERRM
+  );
+END;
+$function$
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| public | deactivate_referral_code         | CREATE OR REPLACE FUNCTION public.deactivate_referral_code(p_code text)
+ RETURNS boolean
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
+DECLARE
+  v_caller_wallet text;
+BEGIN
+  -- Get caller's wallet address
+  SELECT wallet_address INTO v_caller_wallet
+  FROM profiles
+  WHERE id = auth.uid();
+  
+  -- Check if caller is admin
+  IF NOT public.is_admin_wallet(v_caller_wallet) THEN
+    RAISE EXCEPTION 'Only admin wallets can deactivate referral codes';
+  END IF;
+  
+  -- Deactivate the code
+  UPDATE referral_codes
+  SET is_active = false, updated_at = now()
+  WHERE code = p_code;
+  
+  RETURN FOUND;
+END;
+$function$
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| public | create_order_with_template_id    | CREATE OR REPLACE FUNCTION public.create_order_with_template_id(p_user_id uuid, p_template_id uuid, p_customization_data jsonb DEFAULT '{}'::jsonb, p_price numeric DEFAULT 0.03, p_currency text DEFAULT 'ETH'::text, p_company_data jsonb DEFAULT '{}'::jsonb, p_network_used text DEFAULT 'Ethereum'::text, p_user_wallet text DEFAULT NULL::text, p_company_id uuid DEFAULT NULL::uuid)
+ RETURNS uuid
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
+DECLARE
+  v_template_id_short text;
+  v_order_id uuid;
+BEGIN
+  -- Get template_id_short
+  SELECT template_id_short INTO v_template_id_short
+  FROM video_templates
+  WHERE id = p_template_id;
+  
+  IF v_template_id_short IS NULL THEN
+    RAISE EXCEPTION 'Template not found: %', p_template_id;
+  END IF;
+  
+  -- Insert order (now includes company_id)
+  INSERT INTO orders (
+    user_id,
+    template_id,
+    customization_data,
+    price,
+    currency,
+    template_number,
+    company_data,
+    company_id,
+    network_used,
+    user_wallet,
+    transaction_status,
+    estimated_delivery
+  ) VALUES (
+    p_user_id,
+    p_template_id,
+    p_customization_data,
+    p_price,
+    p_currency,
+    v_template_id_short,
+    p_company_data,
+    p_company_id,
+    p_network_used,
+    p_user_wallet,
+    'pending_payment',
+    now() + INTERVAL '24 hours'
+  )
+  RETURNING id INTO v_order_id;
+  
+  RETURN v_order_id;
+END;
+$function$
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| public | create_referral_code             | CREATE OR REPLACE FUNCTION public.create_referral_code(p_code text, p_description text DEFAULT NULL::text, p_is_single_use boolean DEFAULT true, p_max_uses integer DEFAULT 1, p_expires_at timestamp with time zone DEFAULT NULL::timestamp with time zone)
+ RETURNS uuid
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
+DECLARE
+  v_caller_wallet text;
+  v_new_code_id uuid;
+BEGIN
+  -- Get caller's wallet address
+  SELECT wallet_address INTO v_caller_wallet
+  FROM profiles
+  WHERE id = auth.uid();
+  
+  -- Check if caller is admin
+  IF NOT public.is_admin_wallet(v_caller_wallet) THEN
+    RAISE EXCEPTION 'Only admin wallets can create referral codes';
+  END IF;
+  
+  -- Validate code format (alphanumeric, underscores, hyphens)
+  IF NOT (p_code ~ '^[A-Za-z0-9_-]+$') THEN
+    RAISE EXCEPTION 'Referral code can only contain letters, numbers, underscores, and hyphens';
+  END IF;
+  
+  -- Create the referral code
+  INSERT INTO referral_codes (
+    code,
+    description,
+    is_single_use,
+    max_uses,
+    expires_at,
+    created_by
+  ) VALUES (
+    p_code,
+    p_description,
+    p_is_single_use,
+    p_max_uses,
+    p_expires_at,
+    auth.uid()
+  )
+  RETURNING id INTO v_new_code_id;
+  
+  RETURN v_new_code_id;
+END;
+$function$
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| public | is_admin_wallet                  | CREATE OR REPLACE FUNCTION public.is_admin_wallet(p_wallet_address text)
+ RETURNS boolean
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+BEGIN
+  -- Direct query without RLS interference
+  RETURN EXISTS (
+    SELECT 1 
+    FROM admin_wallets 
+    WHERE lower(wallet_address) = lower(p_wallet_address) 
+    AND is_active = true
+  );
+END;
+$function$
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| public | create_detailed_payment_log      | CREATE OR REPLACE FUNCTION public.create_detailed_payment_log(p_order_id uuid, p_tx_hash text, p_network text, p_amount numeric, p_status text, p_verification_step text, p_error_message text DEFAULT NULL::text, p_verification_source text DEFAULT 'edge-function'::text, p_request_data jsonb DEFAULT NULL::jsonb, p_response_data jsonb DEFAULT NULL::jsonb, p_transaction_data jsonb DEFAULT NULL::jsonb, p_blockchain_response jsonb DEFAULT NULL::jsonb, p_processing_time_ms integer DEFAULT NULL::integer, p_ip_address text DEFAULT NULL::text, p_user_agent text DEFAULT NULL::text, p_user_id uuid DEFAULT NULL::uuid, p_correlation_id uuid DEFAULT NULL::uuid)
+ RETURNS uuid
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
+DECLARE
+  log_id uuid;
+  new_correlation_id uuid;
+BEGIN
+  -- Generate a new correlation ID if not provided
+  IF p_correlation_id IS NULL THEN
+    new_correlation_id := gen_random_uuid();
+  ELSE
+    new_correlation_id := p_correlation_id;
+  END IF;
+
+  INSERT INTO payment_logs (
+    order_id,
+    tx_hash,
+    network,
+    amount,
+    status,
+    error_message,
+    verification_source,
+    request_data,
+    response_data,
+    correlation_id,
+    verification_step,
+    transaction_data,
+    blockchain_response,
+    processing_time_ms,
+    ip_address,
+    user_agent,
+    user_id
+  ) VALUES (
+    p_order_id,
+    p_tx_hash,
+    p_network,
+    p_amount,
+    p_status,
+    p_error_message,
+    p_verification_source,
+    p_request_data,
+    p_response_data,
+    new_correlation_id,
+    p_verification_step,
+    p_transaction_data,
+    p_blockchain_response,
+    p_processing_time_ms,
+    p_ip_address,
+    p_user_agent,
+    p_user_id
+  )
+  RETURNING id INTO log_id;
+  
+  RETURN log_id;
+END;
+$function$
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| public | add_admin_wallet                 | CREATE OR REPLACE FUNCTION public.add_admin_wallet(new_wallet_address text, description text DEFAULT NULL::text)
+ RETURNS uuid
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE
+  current_user_wallet text;
+  new_wallet_id uuid;
+BEGIN
+  -- Get current user's wallet address
+  SELECT profiles.wallet_address INTO current_user_wallet
+  FROM profiles
+  WHERE profiles.id = auth.uid();
+  
+  -- Check if current user is an admin (direct query, no RLS)
+  IF NOT EXISTS (
+    SELECT 1 
+    FROM admin_wallets 
+    WHERE lower(wallet_address) = lower(current_user_wallet) 
+    AND is_active = true
+  ) THEN
+    RAISE EXCEPTION 'Only admin wallets can add new admin wallets';
+  END IF;
+  
+  -- Insert new admin wallet
+  INSERT INTO admin_wallets (wallet_address, description, created_by)
+  VALUES (lower(new_wallet_address), description, auth.uid())
+  RETURNING id INTO new_wallet_id;
+  
+  RETURN new_wallet_id;
+END;
+$function$
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| public | deactivate_admin_wallet          | CREATE OR REPLACE FUNCTION public.deactivate_admin_wallet(wallet_address_to_deactivate text)
+ RETURNS boolean
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE
+  current_user_wallet text;
+BEGIN
+  -- Get current user's wallet address
+  SELECT profiles.wallet_address INTO current_user_wallet
+  FROM profiles
+  WHERE profiles.id = auth.uid();
+  
+  -- Check if current user is an admin (direct query, no RLS)
+  IF NOT EXISTS (
+    SELECT 1 
+    FROM admin_wallets 
+    WHERE lower(wallet_address) = lower(current_user_wallet) 
+    AND is_active = true
+  ) THEN
+    RAISE EXCEPTION 'Only admin wallets can deactivate admin wallets';
+  END IF;
+  
+  -- Prevent self-deactivation
+  IF lower(current_user_wallet) = lower(wallet_address_to_deactivate) THEN
+    RAISE EXCEPTION 'Cannot deactivate your own admin wallet';
+  END IF;
+  
+  -- Deactivate the wallet
+  UPDATE admin_wallets 
+  SET is_active = false, updated_at = now()
+  WHERE lower(wallet_address) = lower(wallet_address_to_deactivate);
+  
+  RETURN true;
+END;
+$function$
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| public | should_refresh_token_prices      | CREATE OR REPLACE FUNCTION public.should_refresh_token_prices()
+ RETURNS boolean
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
+DECLARE
+  last_refresh timestamptz;
+  refresh_interval interval := interval '15 minutes';
+BEGIN
+  -- Get the most recent update timestamp
+  SELECT MAX(last_updated) INTO last_refresh FROM token_prices;
+  
+  -- If no prices exist or last refresh was more than 15 minutes ago
+  RETURN last_refresh IS NULL OR (now() - last_refresh) > refresh_interval;
+END;
+$function$
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| public | refresh_token_prices             | CREATE OR REPLACE FUNCTION public.refresh_token_prices()
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
+DECLARE
+  caller_wallet text;
+  is_admin boolean;
+  should_refresh boolean;
+  result jsonb;
+BEGIN
+  -- Get the caller's wallet address
+  SELECT wallet_address INTO caller_wallet
+  FROM profiles
+  WHERE id = auth.uid();
+  
+  -- Check if caller is an admin
+  SELECT public.is_admin_wallet(caller_wallet) INTO is_admin;
+  
+  IF NOT is_admin THEN
+    RAISE EXCEPTION 'Only admin wallets can refresh token prices';
+  END IF;
+  
+  -- Check if we should refresh based on time interval
+  SELECT public.should_refresh_token_prices() INTO should_refresh;
+  
+  IF NOT should_refresh THEN
+    RETURN jsonb_build_object(
+      'success', false,
+      'message', 'Prices were updated recently. Wait at least 15 minutes between refreshes.',
+      'last_updated', (SELECT MAX(last_updated) FROM token_prices)
+    );
+  END IF;
+  
+  -- In a real implementation, this would call an external API
+  -- For now, we'll insert mock data
+  
+  -- Ethereum
+  INSERT INTO token_prices (
+    token_symbol, network_name, network_id, price_usd, price_eth, change_24h, coingecko_id
+  ) VALUES (
+    'ETH', 'Ethereum', 1, 
+    2340.50 + (random() * 100 - 50), -- Random price around $2340.50
+    1.0, -- 1 ETH = 1 ETH
+    (random() * 10 - 5), -- Random 24h change between -5% and +5%
+    'ethereum'
+  ) ON CONFLICT (token_symbol, network_name) DO UPDATE SET
+    price_usd = EXCLUDED.price_usd,
+    price_eth = EXCLUDED.price_eth,
+    change_24h = EXCLUDED.change_24h,
+    last_updated = now(),
+    updated_at = now();
+    
+  -- Polygon
+  INSERT INTO token_prices (
+    token_symbol, network_name, network_id, price_usd, price_eth, change_24h, coingecko_id
+  ) VALUES (
+    'MATIC', 'Polygon', 137, 
+    0.89 + (random() * 0.1 - 0.05), -- Random price around $0.89
+    0.00038 + (random() * 0.00005 - 0.000025), -- Random ETH price
+    (random() * 10 - 5), -- Random 24h change
+    'matic-network'
+  ) ON CONFLICT (token_symbol, network_name) DO UPDATE SET
+    price_usd = EXCLUDED.price_usd,
+    price_eth = EXCLUDED.price_eth,
+    change_24h = EXCLUDED.change_24h,
+    last_updated = now(),
+    updated_at = now();
+    
+  -- Avalanche
+  INSERT INTO token_prices (
+    token_symbol, network_name, network_id, price_usd, price_eth, change_24h, coingecko_id
+  ) VALUES (
+    'AVAX', 'Avalanche', 43114, 
+    28.45 + (random() * 2 - 1), -- Random price around $28.45
+    0.01215 + (random() * 0.001 - 0.0005), -- Random ETH price
+    (random() * 10 - 5), -- Random 24h change
+    'avalanche-2'
+  ) ON CONFLICT (token_symbol, network_name) DO UPDATE SET
+    price_usd = EXCLUDED.price_usd,
+    price_eth = EXCLUDED.price_eth,
+    change_24h = EXCLUDED.change_24h,
+    last_updated = now(),
+    updated_at = now();
+    
+  -- BNB Chain
+  INSERT INTO token_prices (
+    token_symbol, network_name, network_id, price_usd, price_eth, change_24h, coingecko_id
+  ) VALUES (
+    'BNB', 'BNB Chain', 56, 
+    315.20 + (random() * 10 - 5), -- Random price around $315.20
+    0.1347 + (random() * 0.01 - 0.005), -- Random ETH price
+    (random() * 10 - 5), -- Random 24h change
+    'binancecoin'
+  ) ON CONFLICT (token_symbol, network_name) DO UPDATE SET
+    price_usd = EXCLUDED.price_usd,
+    price_eth = EXCLUDED.price_eth,
+    change_24h = EXCLUDED.change_24h,
+    last_updated = now(),
+    updated_at = now();
+    
+  -- Arbitrum (uses ETH)
+  INSERT INTO token_prices (
+    token_symbol, network_name, network_id, price_usd, price_eth, change_24h, coingecko_id
+  ) VALUES (
+    'ETH', 'Arbitrum', 42161, 
+    2340.50 + (random() * 100 - 50), -- Random price around $2340.50
+    1.0, -- 1 ETH = 1 ETH
+    (random() * 10 - 5), -- Random 24h change
+    'ethereum'
+  ) ON CONFLICT (token_symbol, network_name) DO UPDATE SET
+    price_usd = EXCLUDED.price_usd,
+    price_eth = EXCLUDED.price_eth,
+    change_24h = EXCLUDED.change_24h,
+    last_updated = now(),
+    updated_at = now();
+    
+  -- Return success response
+  RETURN jsonb_build_object(
+    'success', true,
+    'message', 'Token prices refreshed successfully',
+    'timestamp', now()
+  );
+  
+EXCEPTION WHEN OTHERS THEN
+  -- Log error and return failure response
+  RETURN jsonb_build_object(
+    'success', false,
+    'message', 'Error refreshing token prices: ' || SQLERRM,
+    'error', SQLERRM
+  );
+END;
+$function$
+ |
+| public | get_token_prices                 | CREATE OR REPLACE FUNCTION public.get_token_prices()
+ RETURNS TABLE(token_symbol text, network_name text, network_id integer, price_usd numeric, price_eth numeric, change_24h numeric, last_updated timestamp with time zone)
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
+BEGIN
+  RETURN QUERY
+  SELECT 
+    tp.token_symbol,
+    tp.network_name,
+    tp.network_id,
+    tp.price_usd,
+    tp.price_eth,
+    tp.change_24h,
+    tp.last_updated
+  FROM token_prices tp
+  WHERE tp.is_active = true
+  ORDER BY tp.network_name, tp.token_symbol;
+END;
+$function$
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| public | assign_template_id_short         | CREATE OR REPLACE FUNCTION public.assign_template_id_short()
+ RETURNS trigger
+ LANGUAGE plpgsql
+AS $function$
+BEGIN
+  IF NEW.template_id_short IS NULL THEN
+    NEW.template_id_short := generate_next_template_id();
+  END IF;
+  RETURN NEW;
+END;
+$function$
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| public | generate_next_template_id        | CREATE OR REPLACE FUNCTION public.generate_next_template_id()
+ RETURNS text
+ LANGUAGE plpgsql
+AS $function$
+DECLARE
+  next_id integer;
+  formatted_id text;
+BEGIN
+  -- Get the highest existing template_id_short number
+  SELECT COALESCE(MAX(template_id_short::integer), 0) + 1
+  INTO next_id
+  FROM video_templates
+  WHERE template_id_short ~ '^[0-9]+$';
+  
+  -- Format as 4-digit zero-padded string
+  formatted_id := LPAD(next_id::text, 4, '0');
+  
+  RETURN formatted_id;
+END;
+$function$
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| public | get_order_download_history       | CREATE OR REPLACE FUNCTION public.get_order_download_history(p_order_id uuid)
+ RETURNS TABLE(id uuid, user_id uuid, user_wallet_address text, ip_address text, download_time timestamp with time zone, expires_at timestamp with time zone, is_expired boolean)
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
+BEGIN
+  RETURN QUERY
+  SELECT 
+    dl.id,
+    dl.user_id,
+    p.wallet_address as user_wallet_address,
+    dl.ip_address,
+    dl.created_at as download_time,
+    dl.expires_at,
+    dl.expires_at < now() as is_expired
+  FROM 
+    download_logs dl
+  LEFT JOIN
+    profiles p ON dl.user_id = p.id
+  WHERE
+    dl.order_id = p_order_id
+  ORDER BY 
+    dl.created_at DESC;
+END;
+$function$
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| public | generate_next_order_number       | CREATE OR REPLACE FUNCTION public.generate_next_order_number()
+ RETURNS text
+ LANGUAGE plpgsql
+AS $function$
+DECLARE
+  next_id integer;
+  formatted_id text;
+BEGIN
+  SELECT COALESCE(MAX(order_number::integer), 0) + 1
+  INTO next_id
+  FROM orders
+  WHERE order_number ~ '^[0-9]+$';
+
+  formatted_id := LPAD(next_id::text, 4, '0');
+  RETURN formatted_id;
+END;
+$function$
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| public | assign_order_number_trigger      | CREATE OR REPLACE FUNCTION public.assign_order_number_trigger()
+ RETURNS trigger
+ LANGUAGE plpgsql
+AS $function$
+BEGIN
+  IF NEW.order_number IS NULL THEN
+    NEW.order_number := generate_next_order_number();
+  END IF;
+  RETURN NEW;
+END;
+$function$
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| public | update_user_stats                | CREATE OR REPLACE FUNCTION public.update_user_stats()
+ RETURNS trigger
+ LANGUAGE plpgsql
+AS $function$
+BEGIN
+  -- Update the user's stats
+  UPDATE profiles SET 
+    video_count = (
+      SELECT COUNT(*) 
+      FROM orders 
+      WHERE orders.user_id = profiles.id
+    ),
+    total_spent = (
+      SELECT COALESCE(SUM(price), 0) 
+      FROM orders 
+      WHERE orders.user_id = profiles.id
+    ),
+    points = (
+      SELECT COALESCE(COUNT(*) * 50 + 
+        CASE WHEN COUNT(*) >= 10 THEN 500 ELSE 0 END + -- Bonus for 10+ videos
+        CASE WHEN COUNT(*) >= 5 THEN 200 ELSE 0 END,   -- Bonus for 5+ videos
+        0
+      )
+      FROM orders 
+      WHERE orders.user_id = profiles.id
+    ),
+    last_activity = now(),
+    updated_at = now()
+  WHERE id = COALESCE(NEW.user_id, OLD.user_id);
+  
+  RETURN COALESCE(NEW, OLD);
+END;
+$function$
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| public | add_user_points                  | CREATE OR REPLACE FUNCTION public.add_user_points(user_id uuid, points_to_add integer, reason text DEFAULT 'Manual adjustment'::text)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
+BEGIN
+  UPDATE profiles 
+  SET 
+    points = points + points_to_add,
+    last_activity = now(),
+    updated_at = now()
+  WHERE id = user_id;
+  
+  -- Log the points addition (you could create a points_history table for this)
+  -- For now, we'll just update the profile
+END;
+$function$
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| public | update_user_cart                 | CREATE OR REPLACE FUNCTION public.update_user_cart(user_id uuid, cart_data jsonb)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
+BEGIN
+  UPDATE profiles 
+  SET 
+    cart_templates = cart_data,
+    last_activity = now(),
+    updated_at = now()
+  WHERE id = user_id;
+END;
+$function$
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| public | add_admin_wallet                 | CREATE OR REPLACE FUNCTION public.add_admin_wallet(new_wallet_address text)
+ RETURNS boolean
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
+DECLARE
+  current_admin_count integer;
+BEGIN
+  -- Check if the caller is already an admin
+  IF NOT public.is_admin_wallet(
+    (SELECT wallet_address FROM profiles WHERE id = auth.uid())
+  ) THEN
+    RAISE EXCEPTION 'Only existing admins can add new admin wallets';
+  END IF;
+  
+  -- Validate address format
+  IF NOT (new_wallet_address ~ '^0x[a-fA-F0-9]{40}$') THEN
+    RAISE EXCEPTION 'Invalid wallet address format';
+  END IF;
+  
+  -- Check if already an admin
+  IF public.is_admin_wallet(new_wallet_address) THEN
+    RAISE EXCEPTION 'Wallet is already an admin';
+  END IF;
+  
+  -- For now, just log the request (in production, you'd update the policies)
+  RAISE NOTICE 'Admin wallet addition requested: %', new_wallet_address;
+  RAISE NOTICE 'Manual policy update required to complete the process';
+  
+  RETURN true;
+END;
+$function$
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| public | handle_new_user                  | CREATE OR REPLACE FUNCTION public.handle_new_user()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
+begin
+  insert into public.users (auth_id)
+  values (new.id);
+
+  return new;
+end;
+$function$
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| public | debug_auth_context               | CREATE OR REPLACE FUNCTION public.debug_auth_context()
+ RETURNS TABLE(current_user_id uuid, current_user_email text, current_user_raw_metadata jsonb, current_user_metadata jsonb)
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
+BEGIN
+  RETURN QUERY
+  SELECT
+    auth.uid() as current_user_id,
+    auth.email() as current_user_email,
+    (auth.jwt() ->> 'user_metadata')::jsonb as current_user_raw_metadata,
+    (auth.jwt() ->> 'app_metadata')::jsonb as current_user_metadata;
+END;
+$function$
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| public | get_templates_by_categories      | CREATE OR REPLACE FUNCTION public.get_templates_by_categories(cat1 text DEFAULT NULL::text, cat2 text DEFAULT NULL::text, cat3 text DEFAULT NULL::text)
+ RETURNS TABLE(id uuid, name text, description text, preview_url text, thumbnail_url text, category text, category2 text, category3 text, price numeric, duration integer, is_active boolean, created_at timestamp with time zone, updated_at timestamp with time zone, template_id_short text)
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$BEGIN
+  RETURN QUERY
+  SELECT 
+    vt.id,
+    vt.name,
+    vt.description,
+    vt.preview_url,
+    vt.thumbnail_url,
+    vt.category,
+    vt.category2,
+    vt.price,
+    vt.duration,
+    vt.is_active,
+    vt.created_at,
+    vt.updated_at,
+    vt.template_id_short
+  FROM video_templates vt
+  WHERE vt.is_active = true
+    AND vt.is_hidden = false
+    AND (cat1 IS NULL OR vt.category = cat1)
+    AND (cat2 IS NULL OR vt.category2 = cat2)
+    AND (cat3 IS NULL OR vt.category3 = cat3)
+  ORDER BY vt.created_at DESC;
+END;$function$
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| public | create_wallet_profile            | CREATE OR REPLACE FUNCTION public.create_wallet_profile(p_wallet_address text)
+ RETURNS uuid
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE
+  profile_id uuid;
+  auth_user_id uuid;
+  normalized_address text;
+BEGIN
+  -- Normalize the wallet address
+  normalized_address := LOWER(p_wallet_address);
+
+  -- Validate wallet address format
+  IF NOT (normalized_address ~ '^0x[a-f0-9]{40}$') THEN
+    RAISE EXCEPTION 'Invalid wallet address format: %', normalized_address;
+  END IF;
+
+  -- Check if profile already exists
+  SELECT id INTO profile_id
+  FROM profiles
+  WHERE LOWER(wallet_address) = normalized_address;
+
+  IF profile_id IS NOT NULL THEN
+    RETURN profile_id;
+  END IF;
+
+  -- Generate a new UUID for the profile
+  profile_id := gen_random_uuid();
+
+  -- Try to find existing auth user by email pattern
+  SELECT id INTO auth_user_id
+  FROM auth.users
+  WHERE LOWER(email) = normalized_address || '@wallet.local';
+
+  -- If auth user exists, use their ID; otherwise use generated ID
+  IF auth_user_id IS NOT NULL THEN
+    profile_id := auth_user_id;
+  END IF;
+
+  -- Create the profile
+  INSERT INTO profiles (id, wallet_address)
+  VALUES (profile_id, normalized_address)
+  ON CONFLICT (wallet_address) DO UPDATE SET
+    updated_at = now()
+  RETURNING id INTO profile_id;
+
+  RETURN profile_id;
+EXCEPTION
+  WHEN others THEN
+    RAISE EXCEPTION 'Failed to create profile for wallet %: %', p_wallet_address, SQLERRM;
+END;
+$function$
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| public | validate_and_consume_nonce       | CREATE OR REPLACE FUNCTION public.validate_and_consume_nonce(p_wallet_address text, p_nonce text)
+ RETURNS boolean
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
+DECLARE
+    v_nonce_record nonces%ROWTYPE;
+BEGIN
+    -- Normalize wallet address
+    p_wallet_address := lower(p_wallet_address);
+
+    -- Find the nonce record
+    SELECT * INTO v_nonce_record
+    FROM nonces
+    WHERE wallet_address = p_wallet_address
+    AND nonce = p_nonce
+    AND is_used = false
+    AND expires_at > now();
+
+    -- Check if nonce was found
+    IF NOT FOUND THEN
+        RETURN false;
+    END IF;
+
+    -- Mark the nonce as used
+    UPDATE nonces
+    SET is_used = true
+    WHERE id = v_nonce_record.id;
+
+    RETURN true;
+EXCEPTION
+    WHEN OTHERS THEN
+        RETURN false;
+END;
+$function$
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| public | cleanup_expired_nonces           | CREATE OR REPLACE FUNCTION public.cleanup_expired_nonces()
+ RETURNS integer
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
+DECLARE
+    v_deleted_count integer;
+BEGIN
+    DELETE FROM nonces 
+    WHERE expires_at < now() OR is_used = true;
+    
+    GET DIAGNOSTICS v_deleted_count = ROW_COUNT;
+    
+    RETURN v_deleted_count;
+END;
+$function$
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| public | auto_cleanup_nonces              | CREATE OR REPLACE FUNCTION public.auto_cleanup_nonces()
+ RETURNS trigger
+ LANGUAGE plpgsql
+AS $function$
+BEGIN
+    -- Delete expired or used nonces when inserting a new one
+    DELETE FROM nonces 
+    WHERE wallet_address = NEW.wallet_address 
+    AND (expires_at < now() OR is_used = true OR id != NEW.id);
+    
+    RETURN NEW;
+END;
+$function$
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| public | update_updated_at_column         | CREATE OR REPLACE FUNCTION public.update_updated_at_column()
+ RETURNS trigger
+ LANGUAGE plpgsql
+AS $function$
+BEGIN
+  NEW.updated_at = now();
+  RETURN NEW;
+END;
+$function$
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |

@@ -157,34 +157,6 @@ export function useSignUp() {
     });
 }
 
-// OAuth Sign In Mutation
-export function useSignInWithOAuth() {
-    return useMutation({
-        mutationFn: async (provider: 'google' | 'apple'): Promise<AuthResult> => {
-            try {
-                const { error } = await supabase.auth.signInWithOAuth({
-                    provider,
-                    options: {
-                        redirectTo: `${window.location.origin}/`,
-                    },
-                });
-
-                if (error) {
-                    return { success: false, error: error.message };
-                }
-
-                return { success: true };
-            } catch (error) {
-                console.error(`OAuth sign in error (${provider}):`, error);
-                return {
-                    success: false,
-                    error: error instanceof Error ? error.message : `Sign in with ${provider} failed`
-                };
-            }
-        }
-    });
-}
-
 // Sign Out Mutation
 export function useSignOut() {
     const queryClient = useQueryClient();
@@ -211,54 +183,6 @@ export function useSignOut() {
         onError: () => {
             // If sign out fails, refetch current auth state
             queryClient.invalidateQueries({ queryKey: authKeys.all });
-        },
-    });
-}
-
-// Reset Password Mutation
-export function useResetPassword() {
-    return useMutation({
-        mutationFn: async (email: string): Promise<AuthResult> => {
-            try {
-                const { error } = await supabase.auth.resetPasswordForEmail(email, {
-                    redirectTo: `${window.location.origin}/reset-password`,
-                });
-
-                if (error) {
-                    return { success: false, error: error.message };
-                }
-
-                return { success: true };
-            } catch (error) {
-                console.error('Reset password error:', error);
-                return {
-                    success: false,
-                    error: error instanceof Error ? error.message : 'Reset password failed'
-                };
-            }
-        },
-    });
-}
-
-// Update Password Mutation
-export function useUpdatePassword() {
-    return useMutation({
-        mutationFn: async (password: string): Promise<AuthResult> => {
-            try {
-                const { error } = await supabase.auth.updateUser({ password });
-
-                if (error) {
-                    return { success: false, error: error.message };
-                }
-
-                return { success: true };
-            } catch (error) {
-                console.error('Update password error:', error);
-                return {
-                    success: false,
-                    error: error instanceof Error ? error.message : 'Update password failed'
-                };
-            }
         },
     });
 }

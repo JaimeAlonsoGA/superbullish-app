@@ -1,11 +1,12 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { useAccount, useBalance, useSendTransaction, useWaitForTransactionReceipt } from 'wagmi';
 import { parseEther } from 'viem';
 import { toast } from 'sonner';
 import { useCart } from '@/providers/cart-provider';
 import { useTemplatePrice } from './use-template-price';
-import { CartItem } from '@/types/composites';
 import { useCreateTransaction } from '@/queries/transactions.queries';
+import { useNavigate } from 'react-router-dom';
+import { useRefreshUser } from '@/queries/auth.queries';
 
 interface CheckoutState {
     status: 'idle' | 'preparing' | 'confirming' | 'processing' | 'success' | 'error';
@@ -24,32 +25,78 @@ interface UseCheckoutReturn {
     isProcessing: boolean;
 }
 
-const ADMIN_ADDRESS = "0x11e4ffcd8f36361db5d10c2d34984cd026f10085";
+const ADMIN_ADDRESS = "0xc5e62133b221b785d6c5a30e3300b76d5d44476e";
 
 export function useCheckout(): UseCheckoutReturn {
     const { address, chain } = useAccount();
-    // const { data: adminWallet, isLoading: loadingWallet } = useAdminWallet(chain?.id);
     const { items, clearCart } = useCart();
     const { data: balance } = useBalance({ address });
     const { sendTransactionAsync } = useSendTransaction();
-    const createTransaction = useCreateTransaction();
+    const { mutateAsync: createTransactionAsync } = useCreateTransaction();
+    const navigate = useNavigate();
 
-    const [state, setState] = useState<CheckoutState>({
-        status: 'idle'
+    const [state, setState] = useState<CheckoutState>({ status: 'idle' });
+    const processedTxRef = useRef<string | null>(null);
+
+    const itemPrices = items.map(item => {
+        const { priceNative } = useTemplatePrice(item.template.price);
+        return priceNative ?? 0;
     });
 
-    const { totalNative, formattedTotal } = calculateTotals(items);
+    const totalNative = useMemo(() => {
+        return itemPrices.reduce((sum, price) => sum + price, 0);
+    }, [itemPrices]);
 
-    const userBalance = balance
-        ? Number(balance.value) / 10 ** balance.decimals
-        : 0;
+    const { isSuccess: isConfirmed, isError: confirmError } = useWaitForTransactionReceipt({
+        hash: state.transactionHash as `0x${string}` | undefined,
+        confirmations: 1,
+    });
 
+    const formattedTotal = `${totalNative.toFixed(4)} ${chain?.nativeCurrency?.symbol ?? ''}`;
+    const userBalance = balance ? Number(balance.value) / 10 ** balance.decimals : 0;
     const canAfford = userBalance >= totalNative;
     const missingAmount = canAfford ? null : totalNative - userBalance;
+    const formattedBalance = balance ? `${userBalance.toFixed(4)} ${balance.symbol}` : '0';
 
-    const formattedBalance = balance
-        ? `${userBalance.toFixed(4)} ${balance.symbol}`
-        : '0';
+    // Handle confirmed transaction
+    useEffect(() => {
+        if (
+            state.status === 'processing' &&
+            isConfirmed &&
+            state.transactionHash &&
+            processedTxRef.current !== state.transactionHash
+        ) {
+            processedTxRef.current = state.transactionHash;
+
+            createTransactionAsync({
+                items,
+                transactionHash: state.transactionHash,
+                chainId: chain!.id,
+                amount: totalNative,
+            }).then(() => {
+                setState({ status: 'success', transactionHash: state.transactionHash });
+                toast.dismiss();
+                toast.success('Payment successful! Videos are being processed 🎉');
+                clearCart();
+                useRefreshUser();
+                navigate('/dashboard');
+            }).catch((err) => {
+                console.error('Failed to record transaction:', err);
+                setState({ status: 'error', error: 'Failed to record transaction' });
+                toast.dismiss();
+                toast.error('Transaction succeeded but failed to record. Contact support.');
+            });
+        }
+    }, [state.status, isConfirmed, state.transactionHash, createTransactionAsync, items, chain, totalNative, clearCart]);
+
+    // Handle blockchain confirmation error
+    useEffect(() => {
+        if (state.status === 'processing' && confirmError) {
+            setState({ status: 'error', error: 'Transaction failed to confirm' });
+            toast.dismiss();
+            toast.error('Transaction failed on blockchain');
+        }
+    }, [state.status, confirmError]);
 
     const handleCheckout = useCallback(async () => {
         if (!address || !chain) {
@@ -58,7 +105,7 @@ export function useCheckout(): UseCheckoutReturn {
         }
 
         if (!canAfford) {
-            toast.error(`Insufficient funds. You need ${missingAmount?.toFixed(4)} more ${chain.name}`);
+            toast.error(`Insufficient funds. You need ${missingAmount?.toFixed(4)} more ${chain.nativeCurrency?.symbol}`);
             return;
         }
 
@@ -68,6 +115,7 @@ export function useCheckout(): UseCheckoutReturn {
         }
 
         try {
+            processedTxRef.current = null;
             setState({ status: 'preparing' });
             toast.loading('Preparing transaction...');
 
@@ -86,33 +134,15 @@ export function useCheckout(): UseCheckoutReturn {
 
             setState({ status: 'processing', transactionHash: txHash });
             toast.dismiss();
-            toast.loading('Processing transaction...');
-
-            await waitForTransactionConfirmation(txHash);
-
-            await createTransaction.mutateAsync({
-                items,
-                transactionHash: txHash,
-                chainId: chain.id,
-                amount: totalNative,
-            });
-
-            setState({ status: 'success', transactionHash: txHash });
-            toast.dismiss();
-            toast.success('Payment successful! 🎉');
-
-            clearCart();
+            toast.loading('Confirming transaction on blockchain...');
 
         } catch (error: any) {
             console.error('Checkout error:', error);
-            setState({
-                status: 'error',
-                error: error.message || 'Transaction failed'
-            });
+            setState({ status: 'error', error: error.message || 'Transaction failed' });
             toast.dismiss();
             toast.error('Transaction failed. Please try again.');
         }
-    }, [address, chain, items, canAfford, totalNative, missingAmount]);
+    }, [address, chain, items, canAfford, totalNative, missingAmount, sendTransactionAsync]);
 
     return {
         state,
@@ -124,23 +154,4 @@ export function useCheckout(): UseCheckoutReturn {
         handleCheckout,
         isProcessing: ['preparing', 'confirming', 'processing'].includes(state.status),
     };
-}
-
-// Helpers
-function calculateTotals(items: CartItem[]) {
-    const totalNative = items.reduce((sum, item) => {
-        const { priceNative } = useTemplatePrice(item.template.price);
-        return sum + (priceNative ?? 0);
-    }, 0);
-
-    const formattedTotal = `${totalNative.toFixed(4)}`;
-
-    return { totalNative, formattedTotal };
-}
-
-async function waitForTransactionConfirmation(hash: `0x${string}`): Promise<void> {
-    useWaitForTransactionReceipt({
-        hash,
-        confirmations: 1,
-    });
 }

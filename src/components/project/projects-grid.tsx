@@ -16,88 +16,119 @@ export default function ProjectsGrid({ projects, handleSelectProject, handleCrea
     const list = projects ?? [];
     return (
         <section className="space-y-8">
-            <div
-                className="flex flex-wrap items-center gap-4"
-            >
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-stretch">
                 {handleCreateNewProject &&
-                    <button
-                        className="cursor-pointer group flex flex-col items-center"
+                    <Card
                         onClick={handleCreateNewProject}
+                        className={cn(
+                            "group cursor-pointer",
+                            "border border-border/50 bg-card",
+                            "transition-all duration-300",
+                            "hover:shadow-lg hover:border-border"
+                        )}
                     >
-                        <div className="rounded-xl w-20 h-20 border-2 border-dashed border-muted-foreground/40 flex items-center justify-center transition-all group-hover:border-muted-foreground/60 group-hover:bg-muted/30">
-                            <Plus className="w-5 h-5 text-muted-foreground transition-all group-hover:scale-110" />
-                        </div>
-                        <div className="mt-2 text-center font-medium text-xs text-muted-foreground group-hover:text-foreground">
-                            Create Project
-                        </div>
-                    </button>
+                        <CardContent className="p-0 my-auto">
+                            <div className="flex items-center gap-4 px-4">
+                                <div
+                                    className={cn(
+                                        "relative hrink-0 w-16 h-16 rounded-xl overflow-hidden",
+                                        "flex items-center justify-center shadow-sm",
+                                        "transition-transform group-hover:scale-105"
+                                    )}
+                                >
+                                    <Plus
+                                        className="w-12 h-12 text-muted-foreground"
+                                    />
+                                </div>
+
+                                <div className="flex-1 min-w-0 space-y-1.5">
+                                    <h3 className="font-semibold text-base truncate">
+                                        Create New project
+                                    </h3>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
                 }
 
-                {list.map((c) => {
-                    const bg = c.background_color ?? "#f4f4f5";
-                    const mainColor = c.main_color ?? "transparent";
+                {list.map((p) => {
+                    const bg = p.background_color ?? "#f4f4f5";
+                    const mainColor = p.main_color ?? "transparent";
 
                     return (
                         <Card
-                            onClick={() => handleSelectProject(c)} key={c.id}
+                            key={p.id}
+                            onClick={() => handleSelectProject(p)}
                             className={cn(
-                                "cursor-pointer",
-                                "group rounded-2xl overflow-hidden border border-muted-foreground/20 shadow-sm",
-                                "transition-all hover:shadow-xl hover:-translate-y-1 hover:border-muted-foreground/40"
+                                "group cursor-pointer overflow-hidden rounded-2xl",
+                                "border border-border/50 bg-card",
+                                "transition-all duration-300",
+                                "hover:shadow-lg hover:border-border"
                             )}
                         >
-                            <CardHeader className="flex flex-row items-center justify-between">
-                                <h3 className="font-semibold text-lg truncate">{c.name}</h3>
-
-                                {c.ticker && (
-                                    <Badge
-                                        variant="secondary"
-                                        className="w-fit mt-1 text-xs px-2 py-0.5"
-                                        style={{ backgroundColor: mainColor, color: "white" }}
+                            <CardContent className="p-0">
+                                <div className="flex items-center gap-4 px-4 py-2">
+                                    <div
+                                        className={cn(
+                                            "relative hrink-0 w-16 h-16 rounded-xl overflow-hidden",
+                                            "flex items-center justify-center shadow-sm",
+                                            "transition-transform group-hover:scale-105"
+                                        )}
+                                        style={{ backgroundColor: bg }}
                                     >
-                                        {c.ticker}
-                                    </Badge>
-                                )}
-                            </CardHeader>
+                                        {p.logo_url ? (
+                                            <img
+                                                src={p.logo_url}
+                                                alt={p.name}
+                                                className="w-12 h-12 object-contain"
+                                            />
+                                        ) : (
+                                            <span className="text-xs text-muted-foreground/50">
+                                                No Logo
+                                            </span>
+                                        )}
+                                    </div>
 
-                            <CardContent className="flex justify-center">
-                                <div
-                                    className={cn(
-                                        "w-24 h-24 rounded-xl overflow-hidden flex items-center justify-center shadow-inner",
-                                        "transition-all group-hover:scale-105 group-hover:shadow-md"
-                                    )}
-                                    style={{ backgroundColor: bg }}
-                                >
-                                    {c.logo_url ? (
-                                        <img
-                                            src={c.logo_url}
-                                            alt={c.name}
-                                            className="object-contain w-20 h-20 opacity-90 transition-all group-hover:opacity-70"
-                                        />
-                                    ) : (
-                                        <span className="text-muted-foreground text-sm opacity-70">No Logo</span>
-                                    )}
+                                    <div className="flex-1 min-w-0 space-y-1.5">
+                                        <h3 className="font-semibold text-base truncate">
+                                            {p.name}
+                                        </h3>
+
+                                        {p.ticker && (
+                                            <Badge
+                                                className="text-xs px-2 py-0.5 font-medium"
+                                                style={{
+                                                    backgroundColor: mainColor,
+                                                    color: "white",
+                                                }}
+                                            >
+                                                {p.ticker}
+                                            </Badge>
+                                        )}
+
+                                        <div className="flex items-center gap-3 pt-1">
+                                            <div className="flex items-center gap-1.5">
+                                                <div
+                                                    className="w-4 h-4 rounded-full border shadow-sm"
+                                                    style={{ backgroundColor: mainColor }}
+                                                />
+                                                <span className="text-[10px] text-muted-foreground uppercase tracking-wide">
+                                                    Primary
+                                                </span>
+                                            </div>
+                                            <div className="flex items-center gap-1.5">
+                                                <div
+                                                    className="w-4 h-4 rounded-full border shadow-sm"
+                                                    style={{ backgroundColor: bg }}
+                                                />
+                                                <span className="text-[10px] text-muted-foreground uppercase tracking-wide">
+                                                    BG
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </CardContent>
-
-                            <CardFooter>
-                                <div className="flex gap-3">
-                                    <div className="flex items-center gap-1">
-                                        <span className="text-xs text-muted-foreground mr-1">Main</span>
-                                        <div
-                                            className="w-5 h-5 rounded-full border shadow"
-                                            style={{ backgroundColor: mainColor }}
-                                        />
-                                    </div>
-                                    <div className="flex items-center gap-1">
-                                        <span className="text-xs text-muted-foreground mr-1">Background</span>
-                                        <div
-                                            className="w-5 h-5 rounded-full border shadow"
-                                            style={{ backgroundColor: bg }}
-                                        />
-                                    </div>
-                                </div>
-                            </CardFooter>
                         </Card>
                     );
                 })}

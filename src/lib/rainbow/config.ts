@@ -5,12 +5,10 @@ import {
 import {
   mainnet,
   polygon,
-  optimism,
   arbitrum,
-  base,
   avalanche,
-  opBNB,
-  bounceBit,
+  avalancheFuji,
+  sepolia,
 } from 'wagmi/chains';
 
 declare module 'wagmi' {
@@ -22,5 +20,5 @@ declare module 'wagmi' {
 export const config = getDefaultConfig({
   appName: 'Super Bullish',
   projectId: '5f3134239437995cd1646eb5d78f79d5',
-  chains: [mainnet, polygon, avalanche, arbitrum],
+  chains: [mainnet, polygon, avalanche, arbitrum, avalancheFuji, sepolia],
 });
